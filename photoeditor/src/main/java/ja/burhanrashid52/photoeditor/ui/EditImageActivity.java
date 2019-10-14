@@ -1,6 +1,5 @@
 package ja.burhanrashid52.photoeditor.ui;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -8,8 +7,6 @@ import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.AnticipateOvershootInterpolator;
@@ -63,6 +60,7 @@ public class EditImageActivity extends BaseActivity implements OnPhotoEditorList
     private ConstraintSet mConstraintSet = new ConstraintSet();
     private boolean mIsFilterVisible;
     private String title;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -99,7 +97,8 @@ public class EditImageActivity extends BaseActivity implements OnPhotoEditorList
                 .build(); // build photo editor sdk
 
         mPhotoEditor.setOnPhotoEditorListener(this);
-
+        Uri path = getIntent().getData();
+        mPhotoEditorView.getSource().setImageURI(path);
         //Set Image Dynamically
         // mPhotoEditorView.getSource().setImageResource(R.drawable.color_palette);
     }
@@ -107,8 +106,6 @@ public class EditImageActivity extends BaseActivity implements OnPhotoEditorList
     private void initViews() {
         ImageView imgUndo;
         ImageView imgRedo;
-        ImageView imgCamera;
-        ImageView imgGallery;
         ImageView imgSave;
         ImageView imgClose;
 
@@ -123,12 +120,6 @@ public class EditImageActivity extends BaseActivity implements OnPhotoEditorList
 
         imgRedo = findViewById(R.id.imgRedo);
         imgRedo.setOnClickListener(this);
-
-        imgCamera = findViewById(R.id.imgCamera);
-        imgCamera.setOnClickListener(this);
-
-        imgGallery = findViewById(R.id.imgGallery);
-        imgGallery.setOnClickListener(this);
 
         imgSave = findViewById(R.id.imgSave);
         imgSave.setOnClickListener(this);
@@ -184,77 +175,43 @@ public class EditImageActivity extends BaseActivity implements OnPhotoEditorList
             saveImage();
         } else if (id == R.id.imgClose) {
             onBackPressed();
-        } else if (id == R.id.imgCamera) {
-            Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            startActivityForResult(cameraIntent, CAMERA_REQUEST);
-        } else if (id == R.id.imgGallery) {
-            Intent intent = new Intent();
-            intent.setType("image/*");
-            intent.setAction(Intent.ACTION_GET_CONTENT);
-            startActivityForResult(Intent.createChooser(intent, "Select Picture"), PICK_REQUEST);
         }
     }
 
     @SuppressLint("MissingPermission")
     private void saveImage() {
-        if (requestPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            showLoading("Saving...");
-            File file = new File(Environment.getExternalStorageDirectory()
-                    + File.separator + ""
-                    + System.currentTimeMillis() + ".png");
-            try {
-                file.createNewFile();
 
-                SaveSettings saveSettings = new SaveSettings.Builder()
-                        .setClearViewsEnabled(true)
-                        .setTransparencyEnabled(true)
-                        .build();
+        showLoading("Saving...");
+        File file = new File(getCacheDir(), System.currentTimeMillis() + ".png");
+        try {
+            file.createNewFile();
 
-                mPhotoEditor.saveAsFile(file.getAbsolutePath(), saveSettings, new PhotoEditor.OnSaveListener() {
-                    @Override
-                    public void onSuccess(@NonNull String imagePath) {
-                        hideLoading();
-                        Intent data = new Intent();
-                        data.putExtra("data", imagePath);
-                        setResult(RESULT_OK, data);
-                        finish();
-                        //mPhotoEditorView.getSource().setImageURI(Uri.fromFile(new File(imagePath)));
-                    }
+            SaveSettings saveSettings = new SaveSettings.Builder()
+                    .setClearViewsEnabled(true)
+                    .setTransparencyEnabled(true)
+                    .build();
 
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        hideLoading();
-                        showSnackbar("Failed to save Image");
-                    }
-                });
-            } catch (IOException e) {
-                e.printStackTrace();
-                hideLoading();
-                showSnackbar(e.getMessage());
-            }
-        }
-    }
+            mPhotoEditor.saveAsFile(file.getAbsolutePath(), saveSettings, new PhotoEditor.OnSaveListener() {
+                @Override
+                public void onSuccess(@NonNull String imagePath) {
+                    hideLoading();
+                    Intent data = new Intent();
+                    data.putExtra("data", imagePath);
+                    setResult(RESULT_OK, data);
+                    finish();
+                    //mPhotoEditorView.getSource().setImageURI(Uri.fromFile(new File(imagePath)));
+                }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_OK) {
-            switch (requestCode) {
-                case CAMERA_REQUEST:
-                    mPhotoEditor.clearAllViews();
-                    Bitmap photo = (Bitmap) data.getExtras().get("data");
-                    mPhotoEditorView.getSource().setImageBitmap(photo);
-                    break;
-                case PICK_REQUEST:
-                    try {
-                        mPhotoEditor.clearAllViews();
-                        Uri uri = data.getData();
-                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
-                        mPhotoEditorView.getSource().setImageBitmap(bitmap);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-            }
+                @Override
+                public void onFailure(@NonNull Exception exception) {
+                    hideLoading();
+                    showSnackbar("Failed to save Image");
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+            hideLoading();
+            showSnackbar(e.getMessage());
         }
     }
 
